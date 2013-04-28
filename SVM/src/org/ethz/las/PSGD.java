@@ -16,14 +16,44 @@ public class PSGD {
    */
   public static class Map extends MapReduceBase implements Mapper<LongWritable, Text, LongWritable, Text> {
 
-    final int K = CHOOSE_ME;
+    final int K = 50;
 
     /**
      * Spread the data around on K different machines.
      */
+    
     public void map(LongWritable key, Text value, OutputCollector<LongWritable, Text> output, Reporter reporter) throws IOException {
+    	
+    	
+    	//based on the assumption that each line has one datum
+    	
+    	String megaStr= value.toString();
+    	int lastPos=0;
+        Random nran = new Random();
+        
+    	while(lastPos!=-1){
+    		int curMachine = nran.nextInt(K);
+    		int curPos=megaStr.indexOf("\n");
+    		String line;
+    		if(curPos==-1){ // just incase the end of the file does not have a new line
+    			
+    			line = megaStr.substring(lastPos);
+    			if(line.length()>2){ // making sure there is not an empty line at the end without data
+    				output.collect(new LongWritable(curMachine), new Text(line));
+    			}
+    			break;
+    		}
+    		line= megaStr.substring(lastPos, curPos);
+    		
+    		
+			output.collect(new LongWritable(curMachine), new Text(line));
+		}
+    		
+    	}
+ 
+    	
     }
-  }
+  
 
   /**
    * Each of K reducers has to output one file containing the hyperplane.
@@ -43,13 +73,14 @@ public class PSGD {
         trainingSet.add(instance);
       }
 
-      SVM model = new SVM(trainingSet, CHOOSE_LEARNING_RATE, CHOOSE_LAMBDA);
-
+      SVM model = new SVM(trainingSet, 0.05, 0.01); //TODO choose good constants values here 
+      
       /**
        * null is important here since we don't want to do additional preprocessing
        * to remove the key. The value should be the SVM model (take a look at method
        * toString in SVM.java.
        */
+      Text outputValue = new Text();
       outputValue.set(model.toString());
       output.collect(null, outputValue);
     }
@@ -72,7 +103,7 @@ public class PSGD {
 
     // set to the same K as above for optimal performance on the cluster
     // If you don't, you will likely have timeout problems.
-    conf.setNumReduceTasks(int K);
+    conf.setNumReduceTasks(50);
 
     FileInputFormat.setInputPaths(conf, new Path(args[0]));
     FileOutputFormat.setOutputPath(conf, new Path(args[1]));
